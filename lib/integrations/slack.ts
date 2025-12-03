@@ -71,4 +71,3 @@ export class SlackService {
     await this.sendWebhookMessage('#credit-crm', message)
   }
 }
-

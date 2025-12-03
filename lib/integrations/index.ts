@@ -39,3 +39,7 @@ export { ConvertKitService } from './convertkit'
 
 // Business Tools
 export { QuickBooksService } from './quickbooks'
+
+// Direct Mail
+export { Click2MailClient, click2mailClient } from './click2mail'
+export { DisputeMailerService, disputeMailerService } from './dispute-mailer'

@@ -1,6 +1,6 @@
 # 🔌 ALL INTEGRATIONS - Complete Reference
 
-**RJ Business Solutions - Rick Jefferson**  
+**RJ Business Solutions - Rick Jefferson**
 **Updated:** December 2, 2025
 
 ---
@@ -388,7 +388,6 @@ const customer = await stripe.createCustomer({...})
 
 ---
 
-**RJ Business Solutions**  
-**Rick Jefferson**  
+**RJ Business Solutions**
+**Rick Jefferson**
 **December 2, 2025**
-
