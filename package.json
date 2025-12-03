@@ -51,7 +51,7 @@
     "@notionhq/client": "^2.2.15",
     "@google/generative-ai": "^0.21.0",
     "googleapis": "^144.0.0",
-    "apify-client": "^3.1.0",
+    "@apify/client": "^2.0.0",
     "openai": "^4.70.0"
   },
   "devDependencies": {

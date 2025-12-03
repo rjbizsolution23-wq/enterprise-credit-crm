@@ -10,6 +10,7 @@
  */
 
 import axios, { AxiosInstance } from 'axios'
+import FormData from 'form-data'
 
 export interface Click2MailConfig {
   username: string
@@ -110,20 +111,33 @@ export class Click2MailClient {
    */
   async uploadDocument(document: Click2MailDocument): Promise<string> {
     try {
+      // Use FormData for Node.js
       const formData = new FormData()
-      const blob = document.documentContent instanceof Buffer
-        ? new Blob([document.documentContent])
-        : new Blob([document.documentContent])
+      
+      const buffer = document.documentContent instanceof Buffer
+        ? document.documentContent
+        : Buffer.from(document.documentContent)
 
-      formData.append('file', blob, document.documentName)
+      formData.append('file', buffer, {
+        filename: document.documentName,
+        contentType: 'application/pdf',
+      })
       formData.append('documentName', document.documentName)
 
-      const response = await this.api.post('/documents', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-          'Accept': 'application/xml',
-        },
-      })
+      const response = await axios.post(
+        `${this.baseUrl}/documents`,
+        formData,
+        {
+          auth: {
+            username: this.config.username,
+            password: this.config.password,
+          },
+          headers: {
+            ...formData.getHeaders(),
+            'Accept': 'application/xml',
+          },
+        }
+      )
 
       return this.extractIdFromResponse(response.data)
     } catch (error: any) {

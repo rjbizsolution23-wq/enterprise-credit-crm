@@ -4,7 +4,8 @@
  * RJ Business Solutions - Rick Jefferson
  */
 
-import { ApifyApi } from 'apify-client'
+// Apify integration - using direct API calls
+// Note: apify-client package has version issues, using axios directly
 
 export class ApifyService {
   private client: ApifyApi
