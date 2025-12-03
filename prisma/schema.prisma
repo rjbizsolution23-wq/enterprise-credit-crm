@@ -1,0 +1,702 @@
+// Enterprise Credit Repair CRM - Database Schema
+// RJ Business Solutions - Rick Jefferson
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// AUTHENTICATION & USERS
+// ============================================
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  password      String
+  firstName     String
+  lastName      String
+  role          UserRole  @default(SPECIALIST)
+  isActive      Boolean   @default(true)
+  lastLogin     DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  clients       Client[]
+  tasks         Task[]
+  activities    Activity[]
+  notes         Note[]
+  disputes      Dispute[]
+  tradelines    Tradeline[]
+  payments      Payment[]
+  sessions      Session[]
+
+  @@index([email])
+  @@index([role])
+}
+
+enum UserRole {
+  ADMIN
+  MANAGER
+  SPECIALIST
+  VIEWER
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([token])
+  @@index([userId])
+}
+
+// ============================================
+// CLIENTS & CONTACTS
+// ============================================
+
+model Client {
+  id                    String   @id @default(cuid())
+  firstName             String
+  lastName              String
+  email                 String?  @unique
+  phone                 String?
+  dateOfBirth           DateTime?
+  ssn                   String?  // Encrypted
+  address               Json?    // {street, city, state, zip}
+
+  // Client Stage & Status
+  stage                 ClientStage @default(NEW_LEAD)
+  status                ClientStatus @default(ACTIVE)
+
+  // Lead Information
+  leadSource            String?
+  consultationDate      DateTime?
+  assignedSpecialistId  String?
+
+  // Service Package
+  servicePackage        ServicePackage?
+  monthlyPaymentAmount  Decimal?  @db.Decimal(10, 2)
+  paymentStatus         PaymentStatus @default(CURRENT)
+
+  // Credit Scores - Starting
+  scoreTransUnionStart  Int?
+  scoreEquifaxStart     Int?
+  scoreExperianStart    Int?
+
+  // Credit Scores - Current
+  scoreTransUnionCurrent Int?
+  scoreEquifaxCurrent   Int?
+  scoreExperianCurrent  Int?
+
+  // Goals & Metrics
+  scoreGoalTarget       Int?
+  negativesTotalCount   Int      @default(0)
+  negativesCollections  Int      @default(0)
+  negativesChargeOffs   Int      @default(0)
+  itemsRemovedTotal     Int      @default(0)
+
+  // Dispute Information
+  disputeRoundCurrent   DisputeRound @default(NOT_STARTED)
+
+  // AI Metrics
+  engagementScore       Int      @default(0)
+  churnRiskProbability  Decimal? @db.Decimal(5, 4)
+
+  // Course & Education
+  courseCompletionPercentage Decimal? @db.Decimal(5, 2)
+
+  // Business Funding
+  businessFundingInterested Boolean @default(false)
+  fundingAmountRequested    Decimal? @db.Decimal(12, 2)
+
+  // MFSN Enrollment
+  mfsnEnrollmentStatus  MFSNStatus?
+
+  // Metadata
+  tags                  String[]
+  customFields          Json?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  // Relations
+  assignedSpecialist    User?     @relation(fields: [assignedSpecialistId], references: [id])
+  creditReports         CreditReport[]
+  disputes              Dispute[]
+  tradelines            Tradeline[]
+  payments              Payment[]
+  tasks                 Task[]
+  activities            Activity[]
+  notes                 Note[]
+  documents             Document[]
+  communications        Communication[]
+
+  @@index([email])
+  @@index([stage])
+  @@index([status])
+  @@index([assignedSpecialistId])
+  @@index([createdAt])
+}
+
+enum ClientStage {
+  NEW_LEAD
+  CONSULTATION_SCHEDULED
+  CONSULTATION_COMPLETED
+  FTC_3_DAY_REVIEW
+  ACTIVE_ONBOARDING
+  ACTIVE_ROUND_1
+  ACTIVE_ROUND_2
+  ACTIVE_ROUND_3_PLUS
+  MONITORING_MAINTENANCE
+  GRADUATED
+  CANCELLED
+}
+
+enum ClientStatus {
+  ACTIVE
+  INACTIVE
+  ON_HOLD
+  CANCELLED
+}
+
+enum ServicePackage {
+  BASIC_79
+  PREMIUM_129
+  ELITE_199
+  ENTERPRISE_299
+  COMBO_179
+}
+
+enum PaymentStatus {
+  CURRENT
+  PAST_DUE_1_15
+  PAST_DUE_16_30
+  COLLECTIONS
+  PAID_IN_FULL
+}
+
+enum DisputeRound {
+  NOT_STARTED
+  ROUND_1_FCRA_609_611
+  ROUND_2_METRO_2_ADVANCED
+  ROUND_3_CFPB_AG
+  MONITORING_PHASE
+}
+
+enum MFSNStatus {
+  NOT_STARTED
+  STARTED_PENDING_ID
+  CARD_ADDED_PENDING_SECURITY
+  FULLY_ENROLLED_ACTIVE
+  EXPIRED_NEEDS_REACTIVATION
+}
+
+// ============================================
+// CREDIT REPORTS
+// ============================================
+
+model CreditReport {
+  id                String   @id @default(cuid())
+  clientId          String
+  bureau            CreditBureau
+  reportDate        DateTime
+  score             Int?
+  reportData        Json     // Full report JSON
+  rawData           String?  @db.Text
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  client            Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  tradelines        Tradeline[]
+  negativeItems     NegativeItem[]
+
+  @@index([clientId])
+  @@index([bureau])
+  @@index([reportDate])
+}
+
+enum CreditBureau {
+  TRANSUNION
+  EQUIFAX
+  EXPERIAN
+}
+
+model NegativeItem {
+  id              String   @id @default(cuid())
+  creditReportId  String
+  type            NegativeItemType
+  creditor        String
+  accountNumber   String?
+  dateOpened      DateTime?
+  dateReported   DateTime?
+  balance         Decimal? @db.Decimal(12, 2)
+  status          String?
+  disputeStatus   DisputeItemStatus @default(NOT_DISPUTED)
+  notes           String?  @db.Text
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  creditReport    CreditReport @relation(fields: [creditReportId], references: [id], onDelete: Cascade)
+  disputes        DisputeItem[]
+
+  @@index([creditReportId])
+  @@index([type])
+  @@index([disputeStatus])
+}
+
+enum NegativeItemType {
+  COLLECTION
+  CHARGE_OFF
+  LATE_PAYMENT
+  FORECLOSURE
+  BANKRUPTCY
+  TAX_LIEN
+  JUDGMENT
+  REPOSSESSION
+  OTHER
+}
+
+enum DisputeItemStatus {
+  NOT_DISPUTED
+  DISPUTE_PENDING
+  DISPUTE_IN_PROGRESS
+  DISPUTE_VERIFIED
+  DISPUTE_DELETED
+  DISPUTE_REJECTED
+}
+
+// ============================================
+// DISPUTES & METRO 2
+// ============================================
+
+model Dispute {
+  id                String   @id @default(cuid())
+  clientId          String
+  createdById      String
+  round            DisputeRound
+  type              DisputeType
+  status            DisputeStatus @default(DRAFT)
+  method            DisputeMethod
+  bureau            CreditBureau?
+
+  // Metro 2 Compliance
+  metro2Compliant   Boolean  @default(false)
+  metro2Data        Json?
+
+  // FCRA Compliance
+  fcraCompliant     Boolean  @default(true)
+  fcraSection       String?
+
+  // Tracking
+  submittedDate     DateTime?
+  responseDate      DateTime?
+  responseReceived  Boolean  @default(false)
+  responseData      Json?
+
+  // Results
+  itemsDisputed     Int      @default(0)
+  itemsRemoved      Int      @default(0)
+  itemsVerified     Int      @default(0)
+
+  notes             String?  @db.Text
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  client            Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  createdBy        User      @relation(fields: [createdById], references: [id])
+  items            DisputeItem[]
+  documents        Document[]
+
+  @@index([clientId])
+  @@index([round])
+  @@index([status])
+  @@index([bureau])
+}
+
+enum DisputeType {
+  FCRA_609
+  FCRA_611
+  METRO_2
+  CFPB_COMPLAINT
+  ATTORNEY_GENERAL
+  CUSTOM
+}
+
+enum DisputeStatus {
+  DRAFT
+  PENDING_REVIEW
+  SUBMITTED
+  IN_PROGRESS
+  RESPONDED
+  COMPLETED
+  CANCELLED
+}
+
+enum DisputeMethod {
+  MAIL
+  ONLINE
+  PHONE
+  CFPB_PORTAL
+  ATTORNEY_GENERAL_PORTAL
+}
+
+model DisputeItem {
+  id              String   @id @default(cuid())
+  disputeId       String
+  negativeItemId  String?
+  description     String
+  reason          String   @db.Text
+  evidence        Json?
+  status          DisputeItemStatus @default(DISPUTE_PENDING)
+  result          DisputeResult?
+  resultDate      DateTime?
+  notes           String?  @db.Text
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  dispute         Dispute  @relation(fields: [disputeId], references: [id], onDelete: Cascade)
+  negativeItem    NegativeItem? @relation(fields: [negativeItemId], references: [id])
+
+  @@index([disputeId])
+  @@index([negativeItemId])
+  @@index([status])
+}
+
+enum DisputeResult {
+  DELETED
+  UPDATED
+  VERIFIED
+  REJECTED
+  NO_RESPONSE
+}
+
+// ============================================
+// TRADELINES
+// ============================================
+
+model Tradeline {
+  id                String   @id @default(cuid())
+  clientId          String
+  createdById       String
+  type              TradelineType
+  status            TradelineStatus @default(PENDING)
+
+  // Account Information
+  accountName       String
+  accountNumber     String?
+  creditLimit       Decimal?  @db.Decimal(12, 2)
+  currentBalance    Decimal?  @db.Decimal(12, 2)
+  paymentHistory    Json?     // Payment history data
+  dateOpened        DateTime?
+  dateAdded         DateTime  @default(now())
+
+  // Authorized User Specific
+  primaryAccountHolder String?
+  relationshipType    String?
+
+  // Business Tradeline Specific
+  businessName      String?
+  ein               String?
+
+  // Primary Tradeline Specific
+  isPrimary         Boolean   @default(false)
+
+  // Credit Impact
+  creditBureau      CreditBureau?
+  scoreImpact       Int?
+  monthsOnReport    Int?
+
+  // Tracking
+  startDate         DateTime?
+  endDate           DateTime?
+  notes             String?   @db.Text
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  client            Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  createdBy         User      @relation(fields: [createdById], references: [id])
+  creditReport      CreditReport? @relation(fields: [creditReportId], references: [id])
+
+  creditReportId   String?
+
+  @@index([clientId])
+  @@index([type])
+  @@index([status])
+}
+
+enum TradelineType {
+  AUTHORIZED_USER
+  BUSINESS
+  PRIMARY
+  SECURED_CARD
+  CREDIT_BUILDER
+}
+
+enum TradelineStatus {
+  PENDING
+  ACTIVE
+  INACTIVE
+  REMOVED
+  EXPIRED
+}
+
+// ============================================
+// PAYMENTS & BILLING
+// ============================================
+
+model Payment {
+  id                String   @id @default(cuid())
+  clientId          String
+  processedById     String?
+  amount            Decimal   @db.Decimal(10, 2)
+  type              PaymentType
+  status            PaymentTransactionStatus @default(PENDING)
+  method            PaymentMethod?
+  transactionId     String?
+  invoiceNumber     String?
+  dueDate           DateTime?
+  paidDate          DateTime?
+  notes             String?   @db.Text
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  client            Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  processedBy      User?     @relation(fields: [processedById], references: [id])
+
+  @@index([clientId])
+  @@index([status])
+  @@index([dueDate])
+}
+
+enum PaymentType {
+  MONTHLY_SUBSCRIPTION
+  ONE_TIME_PAYMENT
+  REFUND
+  ADJUSTMENT
+}
+
+enum PaymentTransactionStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  REFUNDED
+  CANCELLED
+}
+
+enum PaymentMethod {
+  CREDIT_CARD
+  DEBIT_CARD
+  ACH
+  CHECK
+  WIRE
+  OTHER
+}
+
+// ============================================
+// TASKS & ACTIVITIES
+// ============================================
+
+model Task {
+  id                String   @id @default(cuid())
+  title             String
+  description       String?  @db.Text
+  clientId          String?
+  assignedToId      String
+  createdById       String
+  status            TaskStatus @default(PENDING)
+  priority          TaskPriority @default(MEDIUM)
+  dueDate           DateTime?
+  completedDate     DateTime?
+  notes             String?  @db.Text
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  client            Client?   @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  assignedTo       User      @relation(fields: [assignedToId], references: [id])
+  createdBy        User      @relation(fields: [createdById], references: [id])
+
+  @@index([clientId])
+  @@index([assignedToId])
+  @@index([status])
+  @@index([dueDate])
+}
+
+enum TaskStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+  DEFERRED
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+model Activity {
+  id                String   @id @default(cuid())
+  clientId          String?
+  userId            String
+  type              ActivityType
+  title             String
+  description       String?  @db.Text
+  metadata          Json?
+  createdAt         DateTime  @default(now())
+
+  client            Client?   @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  user              User      @relation(fields: [userId], references: [id])
+
+  @@index([clientId])
+  @@index([userId])
+  @@index([type])
+  @@index([createdAt])
+}
+
+enum ActivityType {
+  CLIENT_CREATED
+  CLIENT_UPDATED
+  DISPUTE_SUBMITTED
+  DISPUTE_RESPONDED
+  TRADELINE_ADDED
+  PAYMENT_RECEIVED
+  SCORE_UPDATED
+  TASK_COMPLETED
+  NOTE_ADDED
+  DOCUMENT_UPLOADED
+  COMMUNICATION_SENT
+  STAGE_CHANGED
+  CUSTOM
+}
+
+// ============================================
+// NOTES & DOCUMENTS
+// ============================================
+
+model Note {
+  id                String   @id @default(cuid())
+  clientId          String?
+  userId            String
+  title             String?
+  content           String   @db.Text
+  isPrivate         Boolean  @default(false)
+  tags              String[]
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  client            Client?   @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  user              User      @relation(fields: [userId], references: [id])
+
+  @@index([clientId])
+  @@index([userId])
+  @@index([createdAt])
+}
+
+model Document {
+  id                String   @id @default(cuid())
+  clientId          String?
+  disputeId         String?
+  name              String
+  type              DocumentType
+  fileUrl           String
+  fileSize          Int?
+  mimeType          String?
+  uploadedById      String
+  metadata          Json?
+  createdAt         DateTime  @default(now())
+
+  client            Client?   @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  dispute           Dispute?  @relation(fields: [disputeId], references: [id], onDelete: SetNull)
+
+  @@index([clientId])
+  @@index([disputeId])
+  @@index([type])
+}
+
+enum DocumentType {
+  CREDIT_REPORT
+  ID_VERIFICATION
+  DISPUTE_LETTER
+  PROOF_OF_PAYMENT
+  LEGAL_DOCUMENT
+  CONTRACT
+  INVOICE
+  OTHER
+}
+
+// ============================================
+// COMMUNICATIONS
+// ============================================
+
+model Communication {
+  id                String   @id @default(cuid())
+  clientId          String
+  type              CommunicationType
+  direction         CommunicationDirection
+  subject           String?
+  content           String   @db.Text
+  status            CommunicationStatus @default(SENT)
+  sentAt            DateTime?
+  deliveredAt       DateTime?
+  readAt            DateTime?
+  metadata          Json?
+  createdAt         DateTime  @default(now())
+
+  client            Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([clientId])
+  @@index([type])
+  @@index([status])
+  @@index([sentAt])
+}
+
+enum CommunicationType {
+  EMAIL
+  SMS
+  PHONE_CALL
+  LETTER
+  IN_APP_MESSAGE
+}
+
+enum CommunicationDirection {
+  INBOUND
+  OUTBOUND
+}
+
+enum CommunicationStatus {
+  DRAFT
+  SENT
+  DELIVERED
+  READ
+  FAILED
+  BOUNCED
+}
+
+// ============================================
+// SETTINGS & CONFIGURATION
+// ============================================
+
+model SystemSetting {
+  id                String   @id @default(cuid())
+  key               String   @unique
+  value             Json
+  description       String?  @db.Text
+  category          String?
+  updatedAt         DateTime  @updatedAt
+  updatedById       String?
+
+  @@index([key])
+  @@index([category])
+}
