@@ -4,19 +4,25 @@
  * RJ Business Solutions - Rick Jefferson
  */
 
-// Apify integration - using direct API calls
-// Note: apify-client package has version issues, using axios directly
+import axios, { AxiosInstance } from 'axios'
 
 export class ApifyService {
-  private client: ApifyApi
+  private api: AxiosInstance
+  private token: string
 
   constructor() {
-    const token = process.env.APIFY_API_KEY
-    if (!token) {
+    this.token = process.env.APIFY_API_KEY || ''
+    if (!this.token) {
       throw new Error('Apify API key not configured')
     }
 
-    this.client = new ApifyApi({ token })
+    this.api = axios.create({
+      baseURL: 'https://api.apify.com/v2',
+      headers: {
+        'Authorization': `Bearer ${this.token}`,
+        'Content-Type': 'application/json',
+      },
+    })
   }
 
   /**
@@ -24,8 +30,8 @@ export class ApifyService {
    */
   async runActor(actorId: string, input: any): Promise<any> {
     try {
-      const run = await this.client.actor(actorId).call(input)
-      return run
+      const response = await this.api.post(`/acts/${actorId}/runs`, { input })
+      return response.data
     } catch (error: any) {
       throw new Error(`Apify run actor error: ${error.message}`)
     }
@@ -36,10 +42,22 @@ export class ApifyService {
    */
   async getDatasetItems(datasetId: string): Promise<any[]> {
     try {
-      const { items } = await this.client.dataset(datasetId).listItems()
-      return items
+      const response = await this.api.get(`/datasets/${datasetId}/items`)
+      return response.data.items || []
     } catch (error: any) {
       throw new Error(`Apify get dataset items error: ${error.message}`)
+    }
+  }
+
+  /**
+   * Get run status
+   */
+  async getRunStatus(runId: string): Promise<any> {
+    try {
+      const response = await this.api.get(`/actor-runs/${runId}`)
+      return response.data
+    } catch (error: any) {
+      throw new Error(`Apify get run status error: ${error.message}`)
     }
   }
 }
