@@ -78,7 +78,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-**RJ Business Solutions**  
-**Rick Jefferson**  
+**RJ Business Solutions**
+**Rick Jefferson**
 **December 2, 2025**
-

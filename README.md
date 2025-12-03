@@ -195,7 +195,7 @@ MIT License - see [LICENSE](./LICENSE) file for details.
 
 ## 📧 Contact
 
-**Rick Jefferson**  
+**Rick Jefferson**
 **RJ Business Solutions**
 
 - 📧 Email: rjbizsolution23@gmail.com

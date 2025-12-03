@@ -98,7 +98,6 @@ For security concerns:
 
 ---
 
-**RJ Business Solutions**  
-**Rick Jefferson**  
+**RJ Business Solutions**
+**Rick Jefferson**
 **December 2, 2025**
-

@@ -79,6 +79,5 @@ Contact: rjbizsolution23@gmail.com
 
 ---
 
-**RJ Business Solutions**  
+**RJ Business Solutions**
 **Rick Jefferson**
-
